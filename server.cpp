@@ -74,8 +74,8 @@ int Server::eventHandler(const df::Event *p_e) {
         unsigned int mask = UINT_MAX;
         for(list_object.first(); !list_object.isDone(); list_object.next()){
             df:: Object *p_o = list_object.currentObject();
-            //if it is modified and is sword
-            if(p_o->isModified() && p_o -> getType() == "Sword"){
+            //checks for type
+            if(p_o->getType() == "Fruit" || p_o -> getType() == "bomb" || p_o -> getType() == "Sword"){
                 //turn to string
                 std::string serialize_data; 
                 p_o->serialize(&ss, mask);

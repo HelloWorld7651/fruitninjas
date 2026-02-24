@@ -15,6 +15,8 @@
 #include "Event.h"
 #include "WorldManager.h"
 #include "Sword.h"
+#include "Fruit.h"
+#include "bomb.h"
 
 // Game includes.
 #include "game.h"
@@ -74,21 +76,32 @@ int Client::handleData(const df::EventNetwork *p_en) {
     //switch message based on type
     switch(header.type) {
         case MessageType::SYNC_OBJECT: {
-            //sync object
+            //unpack header
             NetSyncObject msg;
             memcpy(&msg, buff, sizeof(NetSyncObject));
-            //extract string, mainly xy coordinate
+
+            //extract string data
             char* string_start = buff + sizeof(NetSyncObject);
             int string_length = msg.header.size - sizeof(NetSyncObject);
             std::string serialize_data_stream(string_start, string_length);
             std::stringstream ss(serialize_data_stream);
+
             //sword id
             int id = msg.id;
+
+            //extract object type
+            std::string type_string;
+            ss >> type_string;
 
             //check if object exist, if not creates it
             df::Object *p_o = WM.objectWithId(id);
             if(p_o == NULL){
-                p_o = new Sword();
+                if(type_string == "Sword")
+                    p_o = new Sword();
+                else if(type_string == "Sword")
+                    p_o = new Fruit("Apple");
+                else if(type_string == "Bomb")
+                    p_o = new Bomb();
                 p_o -> setId(id);
             }
             //updates the object
