@@ -98,9 +98,10 @@ int Client::handleData(const df::EventNetwork *p_en) {
             if(p_o == NULL){
                 if(type_string == "Sword")
                     p_o = new Sword();
-                else if(type_string == "Sword")
-                    p_o = new Fruit("Apple");
-                else if(type_string == "Bomb")
+                else if(type_string == "pear" || type_string == "grapes" || 
+                        type_string == "apple" || type_string == "banana" || type_string == "blueberries")
+                    p_o = new Fruit(type_string);
+                else if(type_string == "bomb")
                     p_o = new Bomb();
                 p_o -> setId(id);
             }
