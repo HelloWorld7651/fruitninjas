@@ -37,57 +37,31 @@ Server::Server() {
   
     LM.writeLog("Server::Server(): Server started.");
 }
+
 int Server::eventHandler(const df::Event *p_e) {
     if(p_e->getType()==df::NETWORK_EVENT){
         const df::EventNetwork *p_ne = (const df::EventNetwork *) p_e;
-        
+        //for new clients
         if(p_ne->getLabel() == df::NetworkEventLabel::ACCEPT){
             LM.writeLog("Server::eventHandler(): accepted connection (total %d)", NM.getNumConnections());
             int socket_index = p_ne->getSocket();
             Sword *p_sword = new Sword;
             p_sword->setId(100+socket_index);
-            
-            // BUG 2 FIX: Send all currently existing objects to the NEW client!
-            df::ObjectList all_objects = WM.getAllObjects();
-            df::ObjectListIterator list_object(&all_objects);
-            for(list_object.first(); !list_object.isDone(); list_object.next()){
-                df::Object *p_o = list_object.currentObject();
-                std::string t = p_o->getType();
-                
-                if(t == "Sword" || t == "Fruit" || t == "Bomb" || t == "bomb" || t == "Timer") {
-                    std::stringstream ss;
-                    ss << t << " ";
-                    p_o->serialize(&ss, UINT_MAX);
-                    std::string serialize_data = ss.str();
-                    int msg_size = sizeof(NetSyncObject) + serialize_data.length();
-                    char *buff = (char*)malloc(msg_size);
-                    NetSyncObject msg;
-                    msg.header.size = msg_size;
-                    msg.header.type = MessageType::SYNC_OBJECT;
-                    msg.id = p_o->getId();
-                    msg.object_type_len = t.length();  
-                    memcpy(buff, &msg, sizeof(NetSyncObject));
-                    memcpy(buff+sizeof(NetSyncObject), serialize_data.c_str(), serialize_data.length());
-                    
-                    // Send directly to the client that just connected
-                    NM.send(buff, msg_size, socket_index); 
-                    free(buff);
-                }
-            }
             return 1;
         }
-        
+        //if new client disconnected
         if(p_ne->getLabel() == df::NetworkEventLabel::CLOSE){
             LM.writeLog("Server::eventHandler(): closed connection");
             GM.setGameOver();
             return 1;
         }
+        //for client sent data
         if(p_ne->getLabel() == df::NetworkEventLabel::DATA){
             return handleData(p_ne);
         }
     }
     
-    // Sync objects during step event
+//sync objects, swords for example, send sword info to all clients
     if(p_e->getType() == df::STEP_EVENT){
         df::ObjectList all_objects = WM.getAllObjects();
         df::ObjectListIterator list_object(&all_objects);
@@ -95,33 +69,47 @@ int Server::eventHandler(const df::Event *p_e) {
         for(list_object.first(); !list_object.isDone(); list_object.next()){
             df::Object *p_o = list_object.currentObject();
             
+            // Check for type, specifically the exact fruit sprite names
             std::string t = p_o->getType();
-            // BUG 1 FIX: Check for the type "Fruit", not the individual sprite names!
-            if(t == "Sword" || t == "Fruit" || t == "Bomb" || t == "bomb" || t == "Timer") {
+            if(t == "Sword" || t == "bomb" || t == "Bomb" || t == "pear" || 
+               t == "grapes" || t == "apple" || t == "banana" || 
+               t == "blueberries" || t == "watermelon") {
                 
+                // BUG FIX: Stop TCP Flooding!
+                // Only send a sync packet if the object is NEW or if a Sword moved.
                 bool needs_sync = false;
                 
+                // isModified(ID) is true ONLY on the exact frame the object is spawned
                 if (p_o->isModified(df::ObjectAttribute::ID)) {
                     needs_sync = true;
                 }
+                // isModified(POSITION) tracks if the Sword actually moved this frame
                 else if (t == "Sword" && p_o->isModified(df::ObjectAttribute::POSITION)) {
                     needs_sync = true;
                 }
 
+                // Only do the heavy serialization and networking if something changed
                 if (needs_sync) {
                     std::stringstream ss;
+                    unsigned int mask = UINT_MAX;
+                    
+                    // serialize type for the spawning
                     ss << t << " ";
-                    p_o->serialize(&ss, UINT_MAX);
-                    std::string serialize_data = ss.str();
+                    
+                    std::string serialize_data; 
+                    p_o->serialize(&ss, mask);
+                    serialize_data = ss.str();
                     
                     int msg_size = sizeof(NetSyncObject) + serialize_data.length();
                     char *buff = (char*)malloc(msg_size);
+                    
                     NetSyncObject msg;
                     msg.header.size = msg_size;
                     msg.header.type = MessageType::SYNC_OBJECT;
                     msg.id = p_o->getId();
                     msg.object_type_len = t.length();  
 
+                    //pack struct
                     memcpy(buff, &msg, sizeof(NetSyncObject));
                     memcpy(buff+sizeof(NetSyncObject), serialize_data.c_str(), serialize_data.length());
 
@@ -129,6 +117,7 @@ int Server::eventHandler(const df::Event *p_e) {
                     for (int i = 0; i < 5; i++) {
                         NM.send(buff, msg_size, i);
                     }
+                    
                     free(buff);
                 }
             }
