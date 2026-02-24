@@ -46,6 +46,7 @@ int Server::eventHandler(const df::Event *p_e) {
             int socket_index = p_ne->getSocket();
             Sword *p_sword = new Sword;
             p_sword->setId(100+socket_index);
+            m_sock_to_sword[socket_index] = p_sword->getId();
             
             df::ObjectList all_objects = WM.getAllObjects();
             df::ObjectListIterator list_object(&all_objects);
@@ -105,11 +106,14 @@ int Server::eventHandler(const df::Event *p_e) {
                t == "blueberries" || t == "watermelon" || t == "Timer") {
                 
                 bool needs_sync = false;
-                
-                if (p_o->isModified(df::ObjectAttribute::ID)) {
-                    needs_sync = true;
-                }
-                else if (t == "Sword" && p_o->isModified(df::ObjectAttribute::POSITION)) {
+
+                if (p_o->isModified(df::ObjectAttribute::ID)) needs_sync = true;
+
+                // swords: sync on movement
+                if (t == "Sword" && p_o->isModified(df::ObjectAttribute::POSITION)) needs_sync = true;
+
+                // fruits: sync when first created
+                if ((t == "pear" || t == "grapes" || t == "apple" || t == "banana" || t == "blueberries")){
                     needs_sync = true;
                 }
 
@@ -132,7 +136,11 @@ int Server::eventHandler(const df::Event *p_e) {
                     memcpy(buff + sizeof(NetSyncObject) + t.length(), serialize_data.c_str(), serialize_data.length());
 
                     NM.send(buff, msg_size, -1);
+                    int rc = NM.send(buff, msg_size);
+                    LM.writeLog("SYNC send rc=%d bytes=%d type=%s id=%d", rc, msg_size, t.c_str(), p_o->getId());
                     free(buff);
+                    p_o->setModified(false);
+                    p_o->setModified(0);
                 }
             }
         }
@@ -165,13 +173,14 @@ int Server::handleData(const df::EventNetwork *p_en) {
                 memcpy(&msg, msg_buff, sizeof(NetMouseMovement));
 
                 // Identify which client moved their mouse
-                int client_socket = p_en->getSocket();
-                int sword_id = 100 + client_socket;
-
-                // Update sword for client
-                df::Object *p_o = WM.objectWithId(sword_id);
-                if (p_o != NULL) {
-                    p_o->setPosition(df::Vector(msg.mouse_x, msg.mouse_y));
+                int sock = p_en->getSocket();
+                auto it = m_sock_to_sword.find(sock);
+                if (it != m_sock_to_sword.end()) {
+                    int sword_id = it->second;
+                    df::Object *p_o = WM.objectWithId(sword_id);
+                    if (p_o != NULL) {
+                        p_o->setPosition(df::Vector(msg.mouse_x, msg.mouse_y));
+                    }
                 }
                 break;
             }

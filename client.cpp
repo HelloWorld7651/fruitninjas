@@ -73,7 +73,7 @@ int Client::eventHandler(const df::Event *p_e) {
             msg.mouse_x = p_mouse_event->getMousePosition().getX();
             msg.mouse_y = p_mouse_event->getMousePosition().getY();
             
-            NM.send(&msg, sizeof(NetMouseMovement), 0);
+            NM.send(&msg, sizeof(NetMouseMovement),-1);
             return 1;
         }
     }
