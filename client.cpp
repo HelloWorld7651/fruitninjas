@@ -12,6 +12,9 @@
 #include "NetworkManager.h"
 #include "utility.h"
 #include "NetMessages.h"
+#include "Event.h"
+#include "WorldManager.h"
+#include "Sword.h"
 
 // Game includes.
 #include "game.h"
@@ -58,7 +61,7 @@ int Client::eventHandler(const df::Event *p_e) {
     return 0;
 }
 
-int Client::handleData(const df::EventNetwork *p_en) {\
+int Client::handleData(const df::EventNetwork *p_en) {
 //read header
     int msg_size = p_en->getBytes();
     char *buff = (char *) malloc(msg_size);
@@ -70,12 +73,32 @@ int Client::handleData(const df::EventNetwork *p_en) {\
 
     //switch message based on type
     switch(header.type) {
-        case MessageType::SYNC_OBJECT:
-            
+        case MessageType::SYNC_OBJECT: {
+            //sync object
+            NetSyncObject msg;
+            memcpy(&msg, buff, sizeof(NetSyncObject));
+            //extract string, mainly xy coordinate
+            char* string_start = buff + sizeof(NetSyncObject);
+            int string_length = msg.header.size - sizeof(NetSyncObject);
+            std::string serialize_data_stream(string_start, string_length);
+            std::stringstream ss(serialize_data_stream);
+            //sword id
+            int id = msg.id;
+
+            //check if object exist, if not creates it
+            df::Object *p_o = WM.objectWithId(id);
+            if(p_o == NULL){
+                p_o = new Sword();
+                p_o -> setId(id);
+            }
+            //updates the object
+            p_o->deserialize(&ss);
+            break;
+        }
         case MessageType::DELETE_OBJECT:
-            
+        break;
         case MessageType::GAME_OVER:
-            
+            break;
     } 
     free(buff);
     return 1;

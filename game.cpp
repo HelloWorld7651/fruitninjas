@@ -59,10 +59,7 @@ int main(int argc, char *argv[]) {
   #else
     setenv("DRAGONFLY_LOG", logfile.c_str(), 1);
   #endif
-  }// Must specify 0 args if server, 1 arg if client.
-  // For client, arg is host to connect to.
-  if (argc != 1 && argc != 2)
-    usage();
+  }
 
   // Setup logfile: server or client.
   if (argc == 1) {
@@ -112,9 +109,6 @@ int main(int argc, char *argv[]) {
 
   // Fruit Ninja splash screen.
   splash();
-
-  // Create initial game objects.
-  populateWorld();
 
     // Startup Server/Client.
     if (is_server)
