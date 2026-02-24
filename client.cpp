@@ -121,10 +121,14 @@ int Client::handleData(const df::EventNetwork *p_en) {
                     p_o = new Fruit(type_string);
                 else if(type_string == "bomb")
                     p_o = new Bomb();
-                p_o -> setId(id);
+                if (p_o != NULL) {
+                    p_o->setId(id);
+                }
             }
-            //updates the object
-            p_o->deserialize(&ss);
+            //updates the client
+            if (p_o != NULL) {
+                p_o->deserialize(&ss);
+            }
             break;
         }
         case MessageType::DELETE_OBJECT:
