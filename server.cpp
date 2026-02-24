@@ -61,7 +61,7 @@ int Server::eventHandler(const df::Event *p_e) {
         }
     }
     
-    //sync objects, swords for example, send sword info to all clients
+//sync objects, swords for example, send sword info to all clients
     if(p_e->getType() == df::STEP_EVENT){
         df::ObjectList all_objects = WM.getAllObjects();
         df::ObjectListIterator list_object(&all_objects);
@@ -75,77 +75,105 @@ int Server::eventHandler(const df::Event *p_e) {
                t == "grapes" || t == "apple" || t == "banana" || 
                t == "blueberries" || t == "watermelon") {
                 
-                std::stringstream ss;
-                unsigned int mask = UINT_MAX;
+                // BUG FIX: Stop TCP Flooding!
+                // Only send a sync packet if the object is NEW or if a Sword moved.
+                bool needs_sync = false;
                 
-                // serialize type for the spawning
-                ss << t << " ";
-                
-                std::string serialize_data; 
-                p_o->serialize(&ss, mask);
-                serialize_data = ss.str();
-                
-                int msg_size = sizeof(NetSyncObject) + serialize_data.length();
-                char *buff = (char*)malloc(msg_size);
-                
-                NetSyncObject msg;
-                msg.header.size = msg_size;
-                msg.header.type = MessageType::SYNC_OBJECT;
-                msg.id = p_o->getId();
-                msg.object_type_len = t.length();  
-
-                //pack struct
-                memcpy(buff, &msg, sizeof(NetSyncObject));
-                memcpy(buff+sizeof(NetSyncObject), serialize_data.c_str(), serialize_data.length());
-
-                // Broadcast to all clients (Sockets 0 through 4)
-                for (int i = 0; i < 5; i++) {
-                    NM.send(buff, msg_size, i);
+                // isModified(ID) is true ONLY on the exact frame the object is spawned
+                if (p_o->isModified(df::ObjectAttribute::ID)) {
+                    needs_sync = true;
                 }
-                
-                free(buff);
+                // isModified(POSITION) tracks if the Sword actually moved this frame
+                else if (t == "Sword" && p_o->isModified(df::ObjectAttribute::POSITION)) {
+                    needs_sync = true;
+                }
+
+                // Only do the heavy serialization and networking if something changed
+                if (needs_sync) {
+                    std::stringstream ss;
+                    unsigned int mask = UINT_MAX;
+                    
+                    // serialize type for the spawning
+                    ss << t << " ";
+                    
+                    std::string serialize_data; 
+                    p_o->serialize(&ss, mask);
+                    serialize_data = ss.str();
+                    
+                    int msg_size = sizeof(NetSyncObject) + serialize_data.length();
+                    char *buff = (char*)malloc(msg_size);
+                    
+                    NetSyncObject msg;
+                    msg.header.size = msg_size;
+                    msg.header.type = MessageType::SYNC_OBJECT;
+                    msg.id = p_o->getId();
+                    msg.object_type_len = t.length();  
+
+                    //pack struct
+                    memcpy(buff, &msg, sizeof(NetSyncObject));
+                    memcpy(buff+sizeof(NetSyncObject), serialize_data.c_str(), serialize_data.length());
+
+                    // Broadcast to all clients
+                    for (int i = 0; i < 5; i++) {
+                        NM.send(buff, msg_size, i);
+                    }
+                    
+                    free(buff);
+                }
             }
         }
         return 1;
     }
     return 0;
 }
-
 int Server::handleData(const df::EventNetwork *p_en) {
-    //read header
     int msg_size = p_en->getBytes();
-    char *buff = (char *) malloc(msg_size);
-    memcpy(buff, p_en->getMessage(), msg_size);
+    const char *buff = (const char *) p_en->getMessage();
 
-    NetHeader header;
-    memcpy(&header, buff, sizeof(NetHeader));
+    int offset = 0;
+    // Loop through the buffer until all bytes are processed
+    while (offset < msg_size) {
+        NetHeader header;
+        memcpy(&header, buff + offset, sizeof(NetHeader));
 
-    //switch message based on type
-    switch(header.type) {
-        case MessageType::MOUSE_MOVEMENT:{
-            //read mouse
-            NetMouseMovement msg;
-            memcpy(&msg, buff, sizeof(NetMouseMovement));
+        // Safety check to prevent reading past the buffer
+        if (offset + header.size > msg_size) {
+            break; 
+        }
 
-            //sword for client
-            int client_socket = p_en->getSocket();
-            int sword_id = 100+client_socket;
+        // Pointer to the start of the current message
+        const char *msg_buff = buff + offset;
 
-            //update sword for client
-            df::Object *p_o = WM.objectWithId(sword_id);
-            if (p_o != NULL) { // Prevent server from crashing
-                p_o->setPosition(df::Vector(msg.mouse_x, msg.mouse_y));
+        // Switch message based on type
+        switch(header.type) {
+            case MessageType::MOUSE_MOVEMENT: {
+                NetMouseMovement msg;
+                memcpy(&msg, msg_buff, sizeof(NetMouseMovement));
+
+                // Identify which client moved their mouse
+                int client_socket = p_en->getSocket();
+                int sword_id = 100 + client_socket;
+
+                // Update sword for client
+                df::Object *p_o = WM.objectWithId(sword_id);
+                if (p_o != NULL) {
+                    p_o->setPosition(df::Vector(msg.mouse_x, msg.mouse_y));
+                }
+                break;
             }
-            break;
-        }
 
-        case MessageType::EXIT:{
-            break;
-        }
-        default:
-            break;    
-            
-    } 
-    free(buff);
+            case MessageType::EXIT: {
+                // If you need to handle client disconnects explicitly here, do so.
+                // Otherwise, the NetworkEventLabel::CLOSE handles the drop.
+                break;
+            }
+            default:
+                break;    
+        } 
+        
+        // Move offset forward by the size of the current message
+        offset += header.size;
+    }
+    
     return 1;
 }

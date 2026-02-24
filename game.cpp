@@ -78,10 +78,10 @@ int main(int argc, char *argv[]) {
   loadResources();
 
   // Dragonfly splash screen.
-  df::splash();
+  //df::splash();
 
   // Fruit Ninja splash screen.
-  splash();
+  //splash();
 
     // Startup Server/Client.
     if (is_server)

@@ -79,80 +79,63 @@ int Client::eventHandler(const df::Event *p_e) {
     }
     return 0;
 }
-
 int Client::handleData(const df::EventNetwork *p_en) {
-    //read header
     int msg_size = p_en->getBytes();
-    char *buff = (char *) malloc(msg_size);
+    const char *buff = (const char *) p_en->getMessage();
 
-    memcpy(buff, p_en->getMessage(), msg_size);
+    int offset = 0;
+    while (offset < msg_size) {
+        // Prevent reading past buffer
+        if (offset + sizeof(NetHeader) > msg_size) break; 
 
-    NetHeader header;
-    memcpy(&header, buff, sizeof(NetHeader));
+        NetHeader header;
+        memcpy(&header, buff + offset, sizeof(NetHeader));
 
-    //switch message based on type
-    switch(header.type) {
-        case MessageType::SYNC_OBJECT: {
-            //unpack header
+        // Prevent infinite loops on corrupted packets
+        if (header.size <= 0 || offset + header.size > msg_size) break; 
+
+        const char *msg_buff = buff + offset;
+
+        if (header.type == MessageType::SYNC_OBJECT) {
             NetSyncObject msg;
-            memcpy(&msg, buff, sizeof(NetSyncObject));
+            memcpy(&msg, msg_buff, sizeof(NetSyncObject));
 
-            //extract string data
-            char* string_start = buff + sizeof(NetSyncObject);
-            int string_length = msg.header.size - sizeof(NetSyncObject);
-            std::string serialize_data_stream(string_start, string_length);
-            std::stringstream ss(serialize_data_stream);
+            // Safely calculate string length to prevent memory corruption
+            int string_length = header.size - sizeof(NetSyncObject);
+            if (string_length > 0) {
+                std::string serialize_data_stream(msg_buff + sizeof(NetSyncObject), string_length);
+                std::stringstream ss(serialize_data_stream);
 
-            //sword id
-            int id = msg.id;
+                int id = msg.id;
+                std::string type_string;
+                ss >> type_string;
 
-            //extract object type
-            std::string type_string;
-            ss >> type_string;
-
-            //check if object exist, if not creates it
-            df::Object *p_o = WM.objectWithId(id);
-            if(p_o == NULL){
-                if(type_string == "Sword") {
-                    p_o = new Sword();
-                } else if(type_string == "pear" || type_string == "grapes" || 
-                          type_string == "apple" || type_string == "banana" || 
-                          type_string == "blueberries" || type_string == "watermelon") {
-                    p_o = new Fruit(type_string);
-                } else if(type_string == "bomb" || type_string == "Bomb") {
-                    p_o = new Bomb();
+                df::Object *p_o = WM.objectWithId(id);
+                if(p_o == NULL) {
+                    if(type_string == "Sword") {
+                        p_o = new Sword();
+                    } else if(type_string == "bomb" || type_string == "Bomb") {
+                        p_o = new Bomb();
+                    } else {
+                        p_o = new Fruit(type_string);
+                    }
+                    
+                    if (p_o != NULL) p_o->setId(id);
                 }
                 
-                // Null check to prevent crashes if object isn't recognized
-                if (p_o != NULL) {
-                    p_o->setId(id);
-                }
+                if (p_o != NULL) p_o->deserialize(&ss);
             }
-            
-            //updates the object
-            if (p_o != NULL) {
-                p_o->deserialize(&ss);
-            }
-            break;
-        }
-        
-        case MessageType::DELETE_OBJECT: {
+        } 
+        else if (header.type == MessageType::DELETE_OBJECT) {
             NetDeleteObject msg;
-            memcpy(&msg, buff, sizeof(NetDeleteObject));
-            
+            memcpy(&msg, msg_buff, sizeof(NetDeleteObject));
             df::Object *p_o = WM.objectWithId(msg.id);
             if (p_o != NULL) {
                 WM.markForDelete(p_o);
             }
-            break;
         }
         
-        case MessageType::GAME_OVER:
-            break;
-            
-        default:
-            break;
+        offset += header.size;
     } 
-    free(buff);
     return 1;
 }
