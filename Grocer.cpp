@@ -10,6 +10,7 @@
 #include "GameManager.h"
 #include "LogManager.h"
 #include "WorldManager.h"
+#include "NetworkManager.h"
 
 // Game includes.
 #include "Fruit.h"
@@ -47,7 +48,8 @@ int Grocer::step(const df::EventStep *p_e) {
   // Fruit and bomb grocer.
   m_spawn -= 1;
   if (m_spawn < 0) {
-
+    //ensures server is the one that spawns grocer, which is both bomb and fruit
+    if(NM.isServer()){
     int mod = m_wave+1 > NUM_FRUITS ? NUM_FRUITS : m_wave + 1;
     //random chance for bomb to spawn
     int bomb_chance = rand()%100;
@@ -86,7 +88,7 @@ int Grocer::step(const df::EventStep *p_e) {
       }
       p_f -> start(m_wave_speed);
     }
-
+    }
     m_spawn = m_wave_spawn;
   }
 
@@ -99,7 +101,10 @@ int Grocer::step(const df::EventStep *p_e) {
     m_wave_speed += SPEED_INC; // Increase Fruit speed.
     m_wave += 1;
     if (m_wave == NUM_WAVES+1)
-      this->gameOver();
+    //ensure server is the one that does gameover not client
+      if(NM.isServer()){
+        this->gameOver();
+      }
   }
     
   return 1;

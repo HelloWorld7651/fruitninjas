@@ -99,6 +99,8 @@ int Client::handleData(const df::EventNetwork *p_en) {
         break;
         case MessageType::GAME_OVER:
             break;
+        default:
+            break;
     } 
     free(buff);
     return 1;

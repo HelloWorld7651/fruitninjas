@@ -24,7 +24,7 @@
 Server::Server() {
 
   // Set as network server.
-  setType("Server");
+  df::NetworkManager::getInstance().setServer(true);
   NM.setServer(true);
   //NM.setMaxConnections(5);
 
@@ -115,7 +115,7 @@ int Server::handleData(const df::EventNetwork *p_en) {
 
     //switch message based on type
     switch(header.type) {
-        case MessageType::MOUSE_MOVEMENT:
+        case MessageType::MOUSE_MOVEMENT:{
         //read mouse
             NetMouseMovement msg;
             memcpy(&msg, buff, sizeof(NetMouseMovement));
@@ -128,9 +128,13 @@ int Server::handleData(const df::EventNetwork *p_en) {
             df::Object *p_o = WM.objectWithId(sword_id);
             p_o->setPosition(df::Vector(msg.mouse_x, msg.mouse_y));
             break;
+        }
 
-        case MessageType::EXIT:
+        case MessageType::EXIT:{
             break;
+        }
+        default:
+            break;    
             
     } 
     free(buff);

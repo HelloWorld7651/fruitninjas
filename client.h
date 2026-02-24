@@ -11,7 +11,11 @@
 // Engine includes.
 #include "EventNetwork.h"
 #include "Object.h"
+#include "NetworkManager.h"
 
+namespace df {
+    class EventNetwork;
+}
 
 class Client : public df::Object {
 

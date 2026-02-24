@@ -32,34 +32,7 @@ int main(int argc, char *argv[]) {
   // Must specify 0 args if server, 1 arg if client.
   // For client, arg is host to connect to.
   if (argc != 1 && argc != 2)
-    usage();
-
-  // Setup logfile: server or client.
-  if (argc == 1) {
-    is_server = true;
-  #if defined(_WIN32) || defined(_WIN64)
-    _putenv_s("DRAGONFLY_LOG", "server.log");
-    _putenv_s("DRAGONFLY_CONFIG", "df-config-server.txt");
-  #else
-    setenv("DRAGONFLY_LOG", "server.log", 1);
-    setenv("DRAGONFLY_CONFIG", "df-config-server.txt", 1);
-  #endif
-  } else {
-    is_server = false;
-  #if defined(_WIN32) || defined(_WIN64)
-    int pid = _getpid();
-  #else
-    int pid = getpid();
-  #endif    
-    std::string logfile = "client";
-    logfile += std::to_string(pid);
-    logfile += ".log";
-  #if defined(_WIN32) || defined(_WIN64)
-    _putenv_s("DRAGONFLY_LOG", logfile.c_str());
-  #else
-    setenv("DRAGONFLY_LOG", logfile.c_str(), 1);
-  #endif
-  }
+    rusage();
 
   // Setup logfile: server or client.
   if (argc == 1) {

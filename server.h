@@ -7,6 +7,11 @@
 
 #include "Object.h"
 #include "EventNetwork.h"
+#include "NetworkManager.h"
+
+namespace df {
+    class EventNetwork;
+}
 
 class Server : public df::Object{
 private:

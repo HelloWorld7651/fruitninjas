@@ -15,8 +15,7 @@
 #include "WorldManager.h"
 #include "NetworkManager.h"
 #include "NetMessages.h"
-#include "client.h"
-#include "server.h"
+#include "EventNetwork.h"
 
 // Game includes.
 #include "Fruit.h"
@@ -57,6 +56,7 @@ int Sword::eventHandler(const df::Event *p_e) {
   if (p_e->getType() == df::MSE_EVENT){
     const df::EventMouse *p_mouse_event = dynamic_cast <const df::EventMouse *> (p_e);
     if (p_mouse_event->getMouseAction() == df::MOVED) {
+      //check if client
       if (!NM.isServer()) {
         //send to server request of mouse
         NetMouseMovement msg;
