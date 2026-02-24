@@ -23,7 +23,6 @@
 #include "game.h"
 #include "client.h"
 
-
 // Constructor, connecting to server.
 Client::Client(std::string server_name) {
     // Set as network client.
@@ -37,21 +36,20 @@ Client::Client(std::string server_name) {
 
     // Connect.
     std::string server_port = df::DRAGONFLY_PORT;
-    LM.writeLog("Client::Client(): Connecting to %s at port %s.",
-	    server_name.c_str(), server_port.c_str());
+    LM.writeLog("Client::Client(): Connecting to %s at port %s.", server_name.c_str(), server_port.c_str());
     if (NM.connect(server_name, server_port) < 0) {
         LM.writeLog("Client::Client(): Error! Unable to connect.");
         exit(-1);
     }
     LM.writeLog("Client::Client(): Client started.");
 }
+
 // Handle event.
 int Client::eventHandler(const df::Event *p_e) {
     if (p_e->getType() == df::NETWORK_EVENT) {
         const df::EventNetwork *p_ne = (const df::EventNetwork *) p_e;
         if(p_ne->getLabel() == df::NetworkEventLabel::CONNECT){
-            LM.writeLog("Client::eventHandler(): accepted connection (total %d)",
-		    NM.getNumConnections());
+            LM.writeLog("Client::eventHandler(): accepted connection (total %d)", NM.getNumConnections());
             return 1;
         }
         if(p_ne->getLabel() == df::NetworkEventLabel::CLOSE){
@@ -63,6 +61,7 @@ int Client::eventHandler(const df::Event *p_e) {
             return handleData(p_ne);
         }
     }
+    
     //checks for mouse event
     if (p_e->getType() == df::MSE_EVENT) {
         const df::EventMouse *p_mouse_event = dynamic_cast <const df::EventMouse *> (p_e);
@@ -82,7 +81,7 @@ int Client::eventHandler(const df::Event *p_e) {
 }
 
 int Client::handleData(const df::EventNetwork *p_en) {
-//read header
+    //read header
     int msg_size = p_en->getBytes();
     char *buff = (char *) malloc(msg_size);
 
@@ -114,27 +113,43 @@ int Client::handleData(const df::EventNetwork *p_en) {
             //check if object exist, if not creates it
             df::Object *p_o = WM.objectWithId(id);
             if(p_o == NULL){
-                if(type_string == "Sword")
+                if(type_string == "Sword") {
                     p_o = new Sword();
-                else if(type_string == "pear" || type_string == "grapes" || 
-                        type_string == "apple" || type_string == "banana" || type_string == "blueberries")
+                } else if(type_string == "pear" || type_string == "grapes" || 
+                          type_string == "apple" || type_string == "banana" || 
+                          type_string == "blueberries" || type_string == "watermelon") {
                     p_o = new Fruit(type_string);
-                else if(type_string == "bomb")
+                } else if(type_string == "bomb" || type_string == "Bomb") {
                     p_o = new Bomb();
+                }
+                
+                // Null check to prevent crashes if object isn't recognized
                 if (p_o != NULL) {
                     p_o->setId(id);
                 }
             }
-            //updates the client
+            
+            //updates the object
             if (p_o != NULL) {
                 p_o->deserialize(&ss);
             }
             break;
         }
-        case MessageType::DELETE_OBJECT:
-        break;
+        
+        case MessageType::DELETE_OBJECT: {
+            NetDeleteObject msg;
+            memcpy(&msg, buff, sizeof(NetDeleteObject));
+            
+            df::Object *p_o = WM.objectWithId(msg.id);
+            if (p_o != NULL) {
+                WM.markForDelete(p_o);
+            }
+            break;
+        }
+        
         case MessageType::GAME_OVER:
             break;
+            
         default:
             break;
     } 

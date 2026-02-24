@@ -9,6 +9,8 @@
 #include "GameManager.h"
 #include "LogManager.h"
 #include "WorldManager.h"
+#include "NetworkManager.h"
+#include "NetMessages.h"
 
 // Game includes.
 #include "game.h"
@@ -45,55 +47,54 @@ int Fruit::eventHandler(const df::Event *p_e) {
 
 // Handle out events.
 int Fruit::out(const df::EventOut *p_e) {
+    //update to return if they are on client. 
+    if (!NM.isServer()) return 0;
 
-  if (m_first_out) { // Ignore first out (when spawning).
-    m_first_out = false;
+    if (m_first_out) { 
+        m_first_out = false;
+        return 1;
+    }
+    df::EventView ev(POINTS_STRING, -25, true);
+    WM.onEvent(&ev);
+    WM.markForDelete(this);
     return 1;
-  }
-
-  // Each out is a "miss", so lose points.
-  df::EventView ev(POINTS_STRING, -25, true);
-  WM.onEvent(&ev);
-
-  // Destroy this Fruit.
-  WM.markForDelete(this);
-
-  // Handled.
-  return 1;
 }
 
 // Handle collision events.
 int Fruit::collide(const df::EventCollision *p_e) {
+// ONLY the server is allowed to handle collisions!
+    if (!NM.isServer()) return 0;
 
-  // Sword collision means ninja sliced this Fruit.
-  if (p_e -> getObject1() -> getType() == SWORD_STRING) {
-
-    // Add points.
-    df::EventView ev(POINTS_STRING, +10, true);
-    WM.onEvent(&ev);
-
-    // Destroy this Fruit.
-    WM.markForDelete(this);
-  }
-
-  // Handled.
-  return 1;
+    if (p_e->getObject1()->getType() == SWORD_STRING) {
+        df::EventView ev(POINTS_STRING, +10, true);
+        WM.onEvent(&ev);
+        WM.markForDelete(this);
+    }
+    return 1;
 }
 
 // Destructor.
 Fruit::~Fruit() {
-
-  // If inside the game world and engine not shutting down,
-  // create explosion and play sound.
-  if (df::boxContainsPosition(WM.getBoundary(), getPosition()) &&
-      GM.getGameOver() == false) {
-    df::explode(getAnimation().getSprite(), getAnimation().getIndex(), getPosition(),
-                EXPLOSION_AGE, EXPLOSION_SPEED, EXPLOSION_ROTATE);
-
-    // Play "splat" sound.
-    std::string sound = "splat-" + std::to_string(rand()%6 + 1);
-    play_sound(sound);
-  }
+// client to delete fruit id
+    if (NM.isServer()) {
+        NetDeleteObject msg;
+        msg.header.size = sizeof(NetDeleteObject);
+        msg.header.type = MessageType::DELETE_OBJECT;
+        msg.id = getId();
+        
+        //Broadcast the deletion to all clients
+        for (int i = 0; i < 5; i++) {
+            NM.send(&msg, sizeof(NetDeleteObject), i);
+        }
+    }
+  //this is the destruction sound and animation
+    if (df::boxContainsPosition(WM.getBoundary(), getPosition()) &&
+        GM.getGameOver() == false) {
+        df::explode(getAnimation().getSprite(), getAnimation().getIndex(), getPosition(),
+                    EXPLOSION_AGE, EXPLOSION_SPEED, EXPLOSION_ROTATE);
+        std::string sound = "splat-" + std::to_string(rand()%6 + 1);
+        play_sound(sound);
+    }
 }
 
 // Setup starting conditions.

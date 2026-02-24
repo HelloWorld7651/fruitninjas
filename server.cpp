@@ -23,33 +23,27 @@
 #include "server.h"
 
 Server::Server() {
+    // Set as network server.
+    df::NetworkManager::getInstance().setServer(true);
+    NM.setServer(true);
 
-  // Set as network server.
-  df::NetworkManager::getInstance().setServer(true);
-  NM.setServer(true);
-  //NM.setMaxConnections(5);
+    // Register for network events.
+    registerInterest(df::NETWORK_EVENT);
+    // register so we can sync frames
+    registerInterest(df::STEP_EVENT);
 
-  // Register for network events.
-  registerInterest(df::NETWORK_EVENT);
-
-    //register so we can sync frames
-  registerInterest(df::STEP_EVENT);
-
-    //spawn grocer
-  new Grocer();
+    // spawn grocer
+    new Grocer();
   
-  LM.writeLog("Server::Server(): Server started.");
+    LM.writeLog("Server::Server(): Server started.");
 }
 
-// Handle event.
-// when player join or leave
 int Server::eventHandler(const df::Event *p_e) {
     if(p_e->getType()==df::NETWORK_EVENT){
         const df::EventNetwork *p_ne = (const df::EventNetwork *) p_e;
         //for new clients
         if(p_ne->getLabel() == df::NetworkEventLabel::ACCEPT){
-            LM.writeLog("Server::eventHandler(): accepted connection (total %d)",
-		    NM.getNumConnections());
+            LM.writeLog("Server::eventHandler(): accepted connection (total %d)", NM.getNumConnections());
             int socket_index = p_ne->getSocket();
             Sword *p_sword = new Sword;
             p_sword->setId(100+socket_index);
@@ -65,48 +59,50 @@ int Server::eventHandler(const df::Event *p_e) {
         if(p_ne->getLabel() == df::NetworkEventLabel::DATA){
             return handleData(p_ne);
         }
-
     }
+    
     //sync objects, swords for example, send sword info to all clients
     if(p_e->getType() == df::STEP_EVENT){
-        //finding all objects
         df::ObjectList all_objects = WM.getAllObjects();
-        //storing in iterator
         df::ObjectListIterator list_object(&all_objects);
-        //loop to get total amount of objects
-        std::stringstream ss;
-        unsigned int mask = UINT_MAX;
+        
         for(list_object.first(); !list_object.isDone(); list_object.next()){
-            df:: Object *p_o = list_object.currentObject();
-            //checks for type, specifically fruit for multiple
+            df::Object *p_o = list_object.currentObject();
+            
+            // Check for type, specifically the exact fruit sprite names
             std::string t = p_o->getType();
-            if(t == "Sword" || t == "bomb" || t == "pear" || t == "grapes" || 
-               t == "apple" || t == "banana" || t == "blueberries") {
+            if(t == "Sword" || t == "bomb" || t == "Bomb" || t == "pear" || 
+               t == "grapes" || t == "apple" || t == "banana" || 
+               t == "blueberries" || t == "watermelon") {
+                
                 std::stringstream ss;
                 unsigned int mask = UINT_MAX;
-                //seralize type for the spawning
+                
+                // serialize type for the spawning
                 ss << t << " ";
-                //turn to string
+                
                 std::string serialize_data; 
                 p_o->serialize(&ss, mask);
-                //convert seralize to string
                 serialize_data = ss.str();
-                //size of object
+                
                 int msg_size = sizeof(NetSyncObject) + serialize_data.length();
                 char *buff = (char*)malloc(msg_size);
-                //NetSync header
+                
                 NetSyncObject msg;
                 msg.header.size = msg_size;
                 msg.header.type = MessageType::SYNC_OBJECT;
                 msg.id = p_o->getId();
-                msg.object_type_len = p_o->getType().length();  
+                msg.object_type_len = t.length();  
 
                 //pack struct
                 memcpy(buff, &msg, sizeof(NetSyncObject));
                 memcpy(buff+sizeof(NetSyncObject), serialize_data.c_str(), serialize_data.length());
 
-                //send to all clients
-                NM.send(buff, msg_size, -1);
+                // Broadcast to all clients (Sockets 0 through 4)
+                for (int i = 0; i < 5; i++) {
+                    NM.send(buff, msg_size, i);
+                }
+                
                 free(buff);
             }
         }
@@ -127,7 +123,7 @@ int Server::handleData(const df::EventNetwork *p_en) {
     //switch message based on type
     switch(header.type) {
         case MessageType::MOUSE_MOVEMENT:{
-        //read mouse
+            //read mouse
             NetMouseMovement msg;
             memcpy(&msg, buff, sizeof(NetMouseMovement));
 
@@ -137,7 +133,9 @@ int Server::handleData(const df::EventNetwork *p_en) {
 
             //update sword for client
             df::Object *p_o = WM.objectWithId(sword_id);
-            p_o->setPosition(df::Vector(msg.mouse_x, msg.mouse_y));
+            if (p_o != NULL) { // Prevent server from crashing
+                p_o->setPosition(df::Vector(msg.mouse_x, msg.mouse_y));
+            }
             break;
         }
 
