@@ -33,7 +33,6 @@ Sword::Sword() {
   setSolidness(df::SPECTRAL);
   setAltitude(df::MAX_ALTITUDE); // Make Sword in foreground.
 
-  registerInterest(df::MSE_EVENT);
   registerInterest(df::KEYBOARD_EVENT);
   registerInterest(df::STEP_EVENT);
   
@@ -51,32 +50,6 @@ Sword::Sword() {
 // Handle event.
 // Return 0 if ignored, else 1.
 int Sword::eventHandler(const df::Event *p_e) {
-
-  // Mouse event.
-  if (p_e->getType() == df::MSE_EVENT){
-    const df::EventMouse *p_mouse_event = dynamic_cast <const df::EventMouse *> (p_e);
-    if (p_mouse_event->getMouseAction() == df::MOVED) {
-      //check if client
-      if (!NM.isServer()) {
-        //send to server request of mouse
-        NetMouseMovement msg;
-        msg.header.size = sizeof(NetMouseMovement);
-        msg.header.type = MessageType::MOUSE_MOVEMENT;
-        //put client coordinate
-        msg.mouse_x = p_mouse_event->getMousePosition().getX();
-        msg.mouse_y = p_mouse_event->getMousePosition().getY();
-                
-        // Send it to the Server
-        NM.send(&msg, sizeof(NetMouseMovement), 0);
-                
-        //ensure local doens't move
-        return 1; 
-        }
-        // if Server, then move mouse
-        setPosition(p_mouse_event->getMousePosition());
-        return 1;
-    }
-  }
   // Step event.
   if (p_e->getType() == df::STEP_EVENT)
   {

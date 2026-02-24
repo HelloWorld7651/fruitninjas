@@ -17,6 +17,7 @@
 #include "Sword.h"
 #include "Fruit.h"
 #include "bomb.h"
+#include "EventMouse.h"
 
 // Game includes.
 #include "game.h"
@@ -31,6 +32,8 @@ Client::Client(std::string server_name) {
 
     // Register for network events.
     registerInterest(df::NETWORK_EVENT);
+    // Register for mouse events
+    registerInterest(df::MSE_EVENT);
 
     // Connect.
     std::string server_port = df::DRAGONFLY_PORT;
@@ -58,6 +61,21 @@ int Client::eventHandler(const df::Event *p_e) {
         }
         if(p_ne->getLabel() == df::NetworkEventLabel::DATA){
             return handleData(p_ne);
+        }
+    }
+    //checks for mouse event
+    if (p_e->getType() == df::MSE_EVENT) {
+        const df::EventMouse *p_mouse_event = dynamic_cast <const df::EventMouse *> (p_e);
+        if (p_mouse_event->getMouseAction() == df::MOVED) {
+            // Send mouse request to server
+            NetMouseMovement msg;
+            msg.header.size = sizeof(NetMouseMovement);
+            msg.header.type = MessageType::MOUSE_MOVEMENT;
+            msg.mouse_x = p_mouse_event->getMousePosition().getX();
+            msg.mouse_y = p_mouse_event->getMousePosition().getY();
+            
+            NM.send(&msg, sizeof(NetMouseMovement), 0);
+            return 1;
         }
     }
     return 0;
