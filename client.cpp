@@ -78,20 +78,17 @@ int Client::eventHandler(const df::Event *p_e) {
         }
     }
     return 0;
-}
-int Client::handleData(const df::EventNetwork *p_en) {
+}int Client::handleData(const df::EventNetwork *p_en) {
     int msg_size = p_en->getBytes();
     const char *buff = (const char *) p_en->getMessage();
 
     int offset = 0;
     while (offset < msg_size) {
-        // Prevent reading past buffer
         if (offset + sizeof(NetHeader) > msg_size) break; 
 
         NetHeader header;
         memcpy(&header, buff + offset, sizeof(NetHeader));
 
-        // Prevent infinite loops on corrupted packets
         if (header.size <= 0 || offset + header.size > msg_size) break; 
 
         const char *msg_buff = buff + offset;
@@ -100,15 +97,16 @@ int Client::handleData(const df::EventNetwork *p_en) {
             NetSyncObject msg;
             memcpy(&msg, msg_buff, sizeof(NetSyncObject));
 
-            // Safely calculate string length to prevent memory corruption
-            int string_length = header.size - sizeof(NetSyncObject);
-            if (string_length > 0) {
-                std::string serialize_data_stream(msg_buff + sizeof(NetSyncObject), string_length);
-                std::stringstream ss(serialize_data_stream);
+            // 1. Extract the type string cleanly from memory
+            std::string type_string(msg_buff + sizeof(NetSyncObject), msg.object_type_len);
+            
+            // 2. Extract the uncorrupted serialization data
+            int data_len = header.size - sizeof(NetSyncObject) - msg.object_type_len;
+            if (data_len > 0) {
+                std::string serialize_data(msg_buff + sizeof(NetSyncObject) + msg.object_type_len, data_len);
+                std::stringstream ss(serialize_data);
 
                 int id = msg.id;
-                std::string type_string;
-                ss >> type_string;
 
                 df::Object *p_o = WM.objectWithId(id);
                 if(p_o == NULL) {
@@ -116,13 +114,16 @@ int Client::handleData(const df::EventNetwork *p_en) {
                         p_o = new Sword();
                     } else if(type_string == "bomb" || type_string == "Bomb") {
                         p_o = new Bomb();
-                    } else {
+                    } else if(type_string == "pear" || type_string == "grapes" || 
+                              type_string == "apple" || type_string == "banana" || 
+                              type_string == "blueberries" || type_string == "watermelon") {
                         p_o = new Fruit(type_string);
                     }
                     
                     if (p_o != NULL) p_o->setId(id);
                 }
                 
+                // 3. Deserialize the pristine stream!
                 if (p_o != NULL) p_o->deserialize(&ss);
             }
         } 
