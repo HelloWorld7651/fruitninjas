@@ -116,13 +116,16 @@ int Client::handleData(const df::EventNetwork *p_en) {
                         p_o = new Sword();
                     } else if(type_string == "bomb" || type_string == "Bomb") {
                         p_o = new Bomb();
-                    } else {
-                        p_o = new Fruit(type_string);
+                    } else if(type_string == "Fruit") {
+                        // Spawn a fruit with a default valid sprite to prevent a crash.
+                        // p_o->deserialize(&ss) will immediately overwrite it with the CORRECT sprite!
+                        p_o = new Fruit("pear"); 
                     }
                     
                     if (p_o != NULL) p_o->setId(id);
                 }
                 
+                // Dragonfly's deserialize handles syncing the correct sprite and position
                 if (p_o != NULL) p_o->deserialize(&ss);
             }
         } 
