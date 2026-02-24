@@ -48,6 +48,8 @@ GAMESRC= \
 	util.cpp \
 	bomb.cpp \
 	gameSave.cpp \
+	client.cpp \
+	server.cpp \
 
 GAME= game.cpp
 EXECUTABLE= fruit-ninja
