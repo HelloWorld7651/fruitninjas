@@ -131,9 +131,7 @@ int Server::eventHandler(const df::Event *p_e) {
                     memcpy(buff + sizeof(NetSyncObject), t.c_str(), t.length());
                     memcpy(buff + sizeof(NetSyncObject) + t.length(), serialize_data.c_str(), serialize_data.length());
 
-                    for (int i = 0; i < 5; i++) {
-                        NM.send(buff, msg_size, i);
-                    }
+                    NM.send(buff, msg_size, -1);
                     free(buff);
                 }
             }

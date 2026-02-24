@@ -83,9 +83,7 @@ Fruit::~Fruit() {
         msg.id = getId();
         
         //Broadcast the deletion to all clients
-        for (int i = 0; i < 5; i++) {
-            NM.send(&msg, sizeof(NetDeleteObject), i);
-        }
+        NM.send(&msg, sizeof(NetDeleteObject), -1);
     }
   //this is the destruction sound and animation
     if (df::boxContainsPosition(WM.getBoundary(), getPosition()) &&
